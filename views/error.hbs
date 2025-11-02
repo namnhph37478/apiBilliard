@@ -1,0 +1,50 @@
+{{!-- views/error.hbs --}}
+<div class="row justify-content-center my-5">
+  <div class="col-lg-8">
+    <div class="card border-danger">
+      <div class="card-header bg-danger-subtle d-flex justify-content-between align-items-center">
+        <strong>Lỗi hệ thống</strong>
+        {{#if requestId}}
+          <span class="badge text-bg-light" title="Request ID để hỗ trợ kỹ thuật">#{{requestId}}</span>
+        {{/if}}
+      </div>
+      <div class="card-body">
+        <h1 class="h4 mb-2">
+          {{#if error.status}}{{error.status}} · {{/if}}{{message}}
+        </h1>
+        {{#if error.code}}
+          <div class="text-muted mb-2">Mã lỗi: <code>{{error.code}}</code></div>
+        {{/if}}
+
+        <p class="mb-0 text-muted">
+          Có thể trang đã bị di chuyển, dữ liệu không hợp lệ, hoặc hệ thống đang bận.
+        </p>
+
+        <hr/>
+
+        <div class="d-flex flex-wrap gap-2">
+          <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Quay lại</a>
+          <a href="/" class="btn btn-primary btn-sm">Về trang chủ</a>
+          <a href="?refresh=1" class="btn btn-outline-primary btn-sm">Thử lại</a>
+        </div>
+      </div>
+
+      {{!-- Stack trace chỉ hiển thị khi res.locals.error có stack (development) --}}
+      {{#if error.stack}}
+        <div class="card-footer">
+          <details open>
+            <summary class="mb-2 fw-semibold">Chi tiết kỹ thuật (stack trace)</summary>
+            <pre class="mb-0 small" style="white-space:pre-wrap">{{error.stack}}</pre>
+          </details>
+        </div>
+      {{/if}}
+    </div>
+
+    <div class="text-muted small mt-3">
+      {{#if user}}
+        Người dùng: {{#if user.name}}{{user.name}}{{else}}{{user.username}}{{/if}} ({{user.role}})
+      {{/if}}
+      {{#if year}} · © {{year}}{{/if}}
+    </div>
+  </div>
+</div>

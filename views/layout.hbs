@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {{#if csrfToken}}<meta name="csrf-token" content="{{csrfToken}}">{{/if}}
+
+    <title>
+      {{#if title}}{{title}} · {{/if}}{{#if appName}}{{appName}}{{else}}Billiard POS{{/if}}
+    </title>
+
+    <!-- Favicon (tùy chỉnh nếu có) -->
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Bootstrap 5 (CDN) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Base styles -->
+    <style>
+      :root { --brand: #22c55e; } /* xanh lá nhẹ */
+      html, body { height: 100%; }
+      body {
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+      }
+      .navbar-brand b { color: var(--brand); }
+      .container-narrow { max-width: 1080px; }
+      .footer {
+        border-top: 1px solid rgba(0,0,0,0.06);
+        padding: 16px 0;
+        margin-top: 32px;
+        color: #6b7280;
+        font-size: 0.9rem;
+      }
+      /* Dark mode */
+      [data-theme="dark"] .navbar { background-color: #0f172a !important; }
+      [data-theme="dark"] body { background: #0b1220; color: #e5e7eb; }
+      [data-theme="dark"] .card { background: #0f172a; color: #e5e7eb; }
+      [data-theme="dark"] .footer { border-color: rgba(255,255,255,0.08); color: #94a3b8; }
+      /* Flash alerts spacing */
+      .flash-stack > .alert { margin-bottom: .5rem; }
+      /* Optional custom area */
+      {{{inlineStyles}}}
+    </style>
+
+    {{{styles}}}
+  </head>
+  <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
+      <div class="container container-narrow">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+          <img src="{{#if logoUrl}}{{logoUrl}}{{else}}/logo.svg{{/if}}" alt="" height="28" onerror="this.style.display='none'"/>
+          <span><b>{{#if appName}}{{appName}}{{else}}Billiard POS{{/if}}</b></span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav" aria-controls="topNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="topNav">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item"><a class="nav-link {{#if navDashboard}}active{{/if}}" href="/">Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link {{#if navTables}}active{{/if}}" href="/tables">Bàn</a></li>
+            <li class="nav-item"><a class="nav-link {{#if navSessions}}active{{/if}}" href="/sessions">Phiên chơi</a></li>
+            <li class="nav-item"><a class="nav-link {{#if navBills}}active{{/if}}" href="/bills">Hóa đơn</a></li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle {{#if navProducts}}active{{/if}}" href="#" role="button" data-bs-toggle="dropdown">Sản phẩm</a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="/products">Danh sách</a></li>
+                <li><a class="dropdown-item" href="/categories">Danh mục</a></li>
+              </ul>
+            </li>
+            <li class="nav-item"><a class="nav-link {{#if navPromotions}}active{{/if}}" href="/promotions">Khuyến mãi</a></li>
+            <li class="nav-item"><a class="nav-link {{#if navReports}}active{{/if}}" href="/reports">Báo cáo</a></li>
+            <li class="nav-item"><a class="nav-link {{#if navSettings}}active{{/if}}" href="/settings">Cài đặt</a></li>
+          </ul>
+
+          <div class="d-flex align-items-center gap-2">
+            <button id="themeToggle" class="btn btn-sm btn-outline-secondary" type="button" title="Chuyển giao diện">
+              <span class="d-none d-sm-inline">Theme</span>
+            </button>
+
+            {{#if user}}
+              <div class="dropdown">
+                <a class="btn btn-sm btn-outline-primary dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+                  {{#if user.name}}{{user.name}}{{else}}{{user.username}}{{/if}} ({{user.role}})
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="/profile">Hồ sơ</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="/logout">Đăng xuất</a></li>
+                </ul>
+              </div>
+            {{else}}
+              <a href="/login" class="btn btn-sm btn-primary">Đăng nhập</a>
+            {{/if}}
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash messages -->
+    <div class="container container-narrow mt-3">
+      <div class="flash-stack">
+        {{#if flash.success}}
+          {{#each flash.success}}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+              {{this}}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {{/each}}
+        {{/if}}
+
+        {{#if flash.info}}
+          {{#each flash.info}}
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+              {{this}}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {{/each}}
+        {{/if}}
+
+        {{#if flash.warning}}
+          {{#each flash.warning}}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+              {{this}}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {{/each}}
+        {{/if}}
+
+        {{#if flash.error}}
+          {{#each flash.error}}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+              {{this}}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {{/each}}
+        {{/if}}
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <main class="container container-narrow py-3">
+      {{{body}}}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container container-narrow d-flex justify-content-between small">
+        <span>© {{year}} {{#if appName}}{{appName}}{{else}}Billiard POS{{/if}}</span>
+        <span class="text-muted">Request ID: {{requestId}}</span>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Theme toggle + basics -->
+    <script>
+      (function () {
+        const key = 'ui_theme';
+        const html = document.documentElement;
+        const saved = localStorage.getItem(key);
+        if (saved === 'dark') html.setAttribute('data-theme', 'dark');
+
+        const btn = document.getElementById('themeToggle');
+        if (btn) {
+          btn.addEventListener('click', function () {
+            const cur = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', cur);
+            localStorage.setItem(key, cur);
+          });
+        }
+      })();
+    </script>
+
+    {{{inlineScripts}}}
+    {{#if scripts}}
+      {{#each scripts}}
+        <script src="{{this}}"></script>
+      {{/each}}
+    {{/if}}
+  </body>
+</html>

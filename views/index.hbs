@@ -1,0 +1,224 @@
+{{!-- views/index.hbs --}}
+<style>
+  .stat-card .label { color:#6b7280; font-size:.85rem; }
+  .stat-card .value { font-weight:700; font-size:1.25rem; }
+  .table-tile { transition: transform .05s ease; }
+  .table-tile:hover { transform: translateY(-1px); }
+  .badge-status { text-transform: capitalize; }
+  .status-available  { background: #ecfdf5; border-color:#10b981; }
+  .status-playing    { background: #fff7ed; border-color:#f59e0b; }
+  .status-reserved   { background: #eef2ff; border-color:#6366f1; }
+  .status-maintenance{ background: #fef2f2; border-color:#ef4444; }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h1 class="h4 mb-0">Bảng điều khiển</h1>
+    <div class="text-muted small">Hôm nay: {{todayText}}</div>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    {{#if branch}}
+      <span class="badge text-bg-light">Chi nhánh: {{branch.name}}</span>
+    {{/if}}
+    <a class="btn btn-sm btn-outline-secondary" href="?refresh=1">Làm mới</a>
+  </div>
+</div>
+
+{{!-- ========== Stats row ========== --}}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="card-body">
+        <div class="label">Doanh thu</div>
+        <div class="value">{{stats.today.totalFmt}}</div>
+        <div class="text-muted small">TB bill: {{stats.today.avgTicketFmt}}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="card-body">
+        <div class="label">Tiền giờ</div>
+        <div class="value">{{stats.today.playAmountFmt}}</div>
+        <div class="text-muted small">Giảm giá: {{stats.today.discountTotalFmt}}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="card-body">
+        <div class="label">Dịch vụ</div>
+        <div class="value">{{stats.today.serviceAmountFmt}}</div>
+        <div class="text-muted small">Phụ thu: {{stats.today.surchargeFmt}}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="card-body">
+        <div class="label">Hóa đơn</div>
+        <div class="value">{{stats.today.billsPaid}}/{{stats.today.bills}}</div>
+        <div class="text-muted small">Tiền mặt: {{stats.today.byPayment.cashFmt}}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{!-- ========== Tables & side panels ========== --}}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Bàn</strong>
+          <span class="text-muted small ms-2">
+            Tổng: {{counts.tables.total}} ·
+            Trống: {{counts.tables.available}} ·
+            Đang chơi: {{counts.tables.playing}} ·
+            Đặt trước: {{counts.tables.reserved}} ·
+            Bảo trì: {{counts.tables.maintenance}}
+          </span>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="/tables" class="btn btn-sm btn-outline-primary">Quản lý bàn</a>
+        </div>
+      </div>
+      <div class="card-body">
+        {{#if tables.length}}
+          <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-2">
+            {{#each tables}}
+              <div class="col">
+                <a href="/tables/{{_id}}" class="card table-tile border status-{{status}} text-decoration-none h-100">
+                  <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div class="fw-semibold">{{name}}</div>
+                      <span class="badge badge-status text-bg-light border">{{status}}</span>
+                    </div>
+                    <div class="small text-muted">
+                      {{#if typeName}}{{typeName}}{{/if}}
+                      {{#if ratePerHour}} · {{ratePerHourFmt}}{{/if}}
+                    </div>
+                    {{#if startTimeText}}
+                      <div class="small text-muted mt-1">Bắt đầu: {{startTimeText}} · {{durationText}}</div>
+                    {{/if}}
+                  </div>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <div class="text-muted">Chưa có bàn nào.</div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Phiên đang chơi</strong>
+        <a href="/sessions" class="btn btn-sm btn-outline-secondary">Xem tất cả</a>
+      </div>
+      <div class="list-group list-group-flush">
+        {{#if sessionsOpen.length}}
+          {{#each sessionsOpen}}
+            <a href="/sessions/{{_id}}" class="list-group-item list-group-item-action d-flex justify-content-between">
+              <div>
+                <div class="fw-semibold">{{tableName}}</div>
+                <div class="small text-muted">Bắt đầu {{startTimeText}} · {{durationText}}</div>
+              </div>
+              <div class="text-end">
+                <div class="small text-muted">SL món: {{itemsCount}}</div>
+                {{#if subTotalFmt}}<div class="fw-semibold">{{subTotalFmt}}</div>{{/if}}
+              </div>
+            </a>
+          {{/each}}
+        {{else}}
+          <div class="list-group-item text-muted">Không có phiên mở.</div>
+        {{/if}}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Khuyến mãi đang áp dụng</strong>
+        <a href="/promotions" class="btn btn-sm btn-outline-secondary">Quản lý</a>
+      </div>
+      <div class="list-group list-group-flush">
+        {{#if promotionsActive.length}}
+          {{#each promotionsActive}}
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between">
+                <div class="fw-semibold">{{name}}</div>
+                <span class="badge text-bg-light">{{scope}}</span>
+              </div>
+              <div class="small text-muted">
+                {{#if timeText}}{{timeText}}{{/if}}
+                {{#if desc}} · {{desc}}{{/if}}
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="list-group-item text-muted">Không có khuyến mãi hoạt động.</div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{!-- ========== Recent bills ========== --}}
+<div class="card mt-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Hóa đơn gần đây</strong>
+    <a href="/bills" class="btn btn-sm btn-outline-secondary">Xem tất cả</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Mã</th>
+          <th>Thời gian</th>
+          <th>Bàn</th>
+          <th>Thu ngân</th>
+          <th class="text-end">Tổng</th>
+          <th>TT</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#if billsRecent.length}}
+          {{#each billsRecent}}
+            <tr>
+              <td><a href="/bills/{{_id}}">{{code}}</a></td>
+              <td class="text-muted small">{{createdAtText}}</td>
+              <td>{{tableName}}</td>
+              <td class="small text-muted">{{staffName}}</td>
+              <td class="text-end fw-semibold">{{totalFmt}}</td>
+              <td>
+                {{#if paid}}
+                  <span class="badge text-bg-success">Paid</span>
+                {{else}}
+                  <span class="badge text-bg-warning">Unpaid</span>
+                {{/if}}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="/bills/{{_id}}/print?paperSize=80mm" target="_blank">In</a>
+              </td>
+            </tr>
+          {{/each}}
+        {{else}}
+          <tr><td colspan="7" class="text-muted">Chưa có hóa đơn.</td></tr>
+        {{/if}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{!-- Optional small auto-refresh (tắt nếu không cần) --}}
+<script>
+  (function () {
+    const should = {{#if autoRefresh}}true{{else}}false{{/if}};
+    if (!should) return;
+    setTimeout(() => { location.reload(); }, 60 * 1000); // 60s
+  })();
+</script>
