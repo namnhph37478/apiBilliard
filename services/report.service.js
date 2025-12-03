@@ -291,12 +291,12 @@ async function topTables({
   const range = ensureRange({ from, to });
   const $match = matchStage({ ...range, branchId, paidOnly });
 
-  // Tổng tiền theo bàn
   const totals = await Bill.aggregate([
     { $match },
     {
       $group: {
         _id: '$table',
+        tableName: { $first: '$tableName' },  // Lấy tên bàn từ Table collection
         total: { $sum: '$total' },
         playAmount: { $sum: '$playAmount' },
         serviceAmount: { $sum: '$serviceAmount' },
@@ -304,7 +304,7 @@ async function topTables({
     },
   ]);
 
-  // Tổng phút chơi theo bàn (từ item type='play')
+  // Tổng phút chơi
   const minutes = await Bill.aggregate([
     { $match },
     { $unwind: '$items' },
@@ -316,7 +316,7 @@ async function topTables({
     minutes.map((m) => [String(m._id), m.minutes || 0])
   );
 
-  // Join tên bàn
+  // Join tên bàn từ Table collection
   const ids = totals.map((t) => t._id).filter(Boolean);
   const tables = await Table.find({ _id: { $in: ids } })
     .select('_id name')
@@ -325,9 +325,10 @@ async function topTables({
     tables.map((t) => [String(t._id), t.name])
   );
 
+  // ✅ Ưu tiên: Table.name → Bill.tableName → fallback
   const rows = totals.map((t) => ({
     table: String(t._id),
-    tableName: nameMap[String(t._id)] || '(unknown)',
+    tableName: nameMap[String(t._id)] || t.tableName || '(unknown)',  // ⭐⭐⭐
     total: t.total || 0,
     playAmount: t.playAmount || 0,
     serviceAmount: t.serviceAmount || 0,
