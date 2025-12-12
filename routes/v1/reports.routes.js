@@ -4,13 +4,13 @@ const router = express.Router();
 
 const ctrl = require('../../controllers/report.controller');
 const { requireAuth } = require('../../middlewares/auth.middleware');
-const { requireRole } = require('../../middlewares/role.middleware');
+const { requireAdmin } = require('../../middlewares/role.middleware');
 
 /**
- * Reports — staff & admin access
- * Tất cả endpoint phía dưới yêu cầu đăng nhập với role: staff | admin
+ * Reports — admin only
+ * Tất cả endpoint phía dưới yêu cầu admin đã đăng nhập.
  */
-router.use(requireAuth, requireRole(['staff', 'admin']));
+router.use(requireAuth, requireAdmin);
 
 // GET /api/v1/reports/summary
 // Tổng quan trong khoảng thời gian

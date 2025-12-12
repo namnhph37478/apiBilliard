@@ -6,15 +6,16 @@ const ctrl = require('../../controllers/category.controller');
 const schema = require('../../validators/category.schema');
 const { validate } = require('../../middlewares/validate.middleware');
 const { requireAuth } = require('../../middlewares/auth.middleware');
-const { requireAdmin } = require('../../middlewares/role.middleware');
+const { requireAdmin, requireRole } = require('../../middlewares/role.middleware');
 
 /* ----------------------------- Admin-only: Category management ----------------------------- */
-// Tất cả route phía dưới đều yêu cầu admin đã đăng nhập
-router.use(requireAuth, requireAdmin);
+// Tất cả route phía dưới đều yêu cầu đăng nhập; GET cho staff/admin, còn lại admin
+router.use('/categories', requireAuth);
 
 // GET /api/v1/categories
 router.get(
   '/categories',
+  requireRole(['staff', 'admin']),
   validate(schema.list),
   ctrl.list
 );
@@ -22,6 +23,7 @@ router.get(
 // GET /api/v1/categories/:id
 router.get(
   '/categories/:id',
+  requireRole(['staff', 'admin']),
   validate(schema.getOne),
   ctrl.getOne
 );
@@ -29,6 +31,7 @@ router.get(
 // POST /api/v1/categories
 router.post(
   '/categories',
+  requireAdmin,
   validate(schema.create),
   ctrl.create
 );

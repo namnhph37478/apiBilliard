@@ -22,7 +22,9 @@ function hasRole(user, allowed) {
 function requireRole(allowed) {
   return (req, res, next) => {
     if (!req.user) return deny(res, 401, 'Unauthorized');
-    if (!hasRole(req.user, allowed)) return deny(res);
+    const ok = hasRole(req.user, allowed);
+
+    if (!ok) return deny(res);
     return next();
   };
 }

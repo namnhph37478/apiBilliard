@@ -12,7 +12,7 @@ const { requireAdmin } = require('../../middlewares/role.middleware');
 /*                      Admin-only: Promotion management                      */
 /* -------------------------------------------------------------------------- */
 // Tất cả route phía dưới yêu cầu admin đã đăng nhập
-router.use(requireAuth, requireAdmin);
+router.use('/promotions', requireAuth, requireAdmin);
 
 // GET /api/v1/promotions
 router.get(

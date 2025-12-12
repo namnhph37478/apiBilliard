@@ -11,8 +11,9 @@ const { requireAdmin } = require('../../middlewares/role.middleware');
 /**
  * User management (Admin only)
  * Tất cả route phía dưới đều yêu cầu admin đã đăng nhập.
+ * Giới hạn middleware theo prefix /users để tránh chặn các router khác.
  */
-router.use(requireAuth, requireAdmin);
+router.use('/users', requireAuth, requireAdmin);
 
 // GET /api/v1/users
 router.get(
