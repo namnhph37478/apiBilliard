@@ -5,12 +5,20 @@ const Bill = require('../models/bill.model');
 const { ensureRange } = require('../utils/time');
 
 function safeRequire(p) {
-  try { return require(p); } catch { return null; }
+  try {
+    return require(p);
+  } catch (err) {
+    console.error('safeRequire error with', p, err);
+    return null;
+  }
 }
 const Exporter = safeRequire('../services/export.service');   // export Excel/PDF (optional)
 const QR = safeRequire('../services/qr.service');             // QR generator (optional)
 const Billing = safeRequire('../services/billing.service');   // to fetch eReceipt setting
 const { getActiveSetting } = Billing || {};
+
+console.log('Exporter keys =', Exporter && Object.keys(Exporter));
+console.log('typeof Exporter.renderBillPDF =', typeof (Exporter && Exporter.renderBillPDF));
 
 /* ====================== Helpers ====================== */
 
@@ -58,6 +66,16 @@ function buildQuery({
   }
 
   return query;
+}
+
+// Public access policy: chỉ cho bill đã thanh toán mới xem được
+function assertPublicBillAccessible(bill) {
+  // Trả 404 cho cả trường hợp chưa paid để không lộ tồn tại bill
+  if (!bill || !bill.paid) {
+    const err = new Error('Bill not found');
+    err._status = 404;
+    throw err;
+  }
 }
 
 /* ====================== Controllers ====================== */
@@ -145,7 +163,6 @@ exports.setNote = R.asyncHandler(async (req, res) => {
 
 // GET /bills/export.xlsx
 exports.exportExcel = R.asyncHandler(async (req, res) => {
-  // gom dữ liệu theo filter, mặc định trong hôm nay nếu không truyền from/to
   const { from: qFrom, to: qTo, branchId, paidOnly = 'true' } = req.query;
   const range = ensureRange({ from: qFrom, to: qTo });
 
@@ -156,12 +173,10 @@ exports.exportExcel = R.asyncHandler(async (req, res) => {
     to: range.to,
   });
 
-  // Limit an toàn để export
   const MAX_EXPORT = Number(process.env.MAX_EXPORT_ROWS || 10000);
   const items = await Bill.find(query).sort({ createdAt: 1 }).limit(MAX_EXPORT).lean();
 
   if (!Exporter || typeof Exporter.exportBillsToExcel !== 'function') {
-    // Fallback: trả JSON nếu service chưa sẵn
     return R.ok(res, {
       note: 'Export service is not available, returning JSON fallback',
       count: items.length,
@@ -201,7 +216,6 @@ exports.print = R.asyncHandler(async (req, res) => {
   if (!bill) return R.fail(res, 404, 'Bill not found');
 
   if (!Exporter || typeof Exporter.renderBillPDF !== 'function') {
-    // Fallback khi chưa có module in: trả JSON để FE tự hiển thị
     return R.ok(
       res,
       { bill, paperSize, embedQR: String(embedQR) === 'true' },
@@ -209,7 +223,6 @@ exports.print = R.asyncHandler(async (req, res) => {
     );
   }
 
-  // Lấy cấu hình in/branding nếu cần
   let setting = null;
   if (typeof getActiveSetting === 'function') {
     setting = await getActiveSetting(bill.branchId || null);
@@ -233,7 +246,6 @@ exports.qr = R.asyncHandler(async (req, res) => {
   const bill = await Bill.findById(id).lean();
   if (!bill) return R.fail(res, 404, 'Bill not found');
 
-  // Tạo đường dẫn e-receipt nếu có baseUrl; fallback dùng code
   let text = bill.code || String(bill._id);
   if (typeof getActiveSetting === 'function') {
     const setting = await getActiveSetting(bill.branchId || null);
@@ -256,7 +268,6 @@ exports.qr = R.asyncHandler(async (req, res) => {
     return res.end(buffer);
   }
 
-  // Fallback: không có lib QR thì trả JSON
   return R.ok(res, { text }, 'QR service not available');
 });
 
@@ -266,9 +277,63 @@ exports.remove = R.asyncHandler(async (req, res) => {
   const doc = await Bill.findById(id);
   if (!doc) return R.fail(res, 404, 'Bill not found');
 
-  // Chính sách: nếu đã paid → không cho xoá
   if (doc.paid) return R.fail(res, 409, 'Không thể xoá hoá đơn đã thanh toán');
 
   await Bill.findByIdAndDelete(id);
   return R.noContent(res);
+});
+
+/* ====================== Public (NO AUTH) ====================== */
+/*
+  Public routes bạn sẽ map:
+    GET  /bill/:id        -> publicView (chỉ bill paid)
+    GET  /bill/:id/pdf    -> publicPrint (chỉ bill paid, trả PDF)
+*/
+
+// GET /bill/:id  (public)
+exports.publicView = R.asyncHandler(async (req, res) => {
+  const bill = await Bill.findById(req.params.id)
+    .populate('table', 'name')
+    .populate('staff', 'name username')
+    .lean();
+
+  assertPublicBillAccessible(bill);
+  return R.ok(res, bill);
+});
+
+// GET /bill/:id/pdf?paperSize=80mm&embedQR=true (public)
+exports.publicPrint = R.asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { paperSize = '80mm', embedQR = 'true' } = req.query;
+
+  const bill = await Bill.findById(id)
+    .populate('table', 'name')
+    .populate('staff', 'name username')
+    .lean();
+
+  assertPublicBillAccessible(bill);
+
+  if (!Exporter || typeof Exporter.renderBillPDF !== 'function') {
+    return R.ok(
+      res,
+      { bill, paperSize, embedQR: String(embedQR) === 'true' },
+      'Print service not available'
+    );
+  }
+
+  let setting = null;
+  if (typeof getActiveSetting === 'function') {
+    setting = await getActiveSetting(bill.branchId || null);
+  }
+
+  const { buffer } = await Exporter.renderBillPDF({
+    bill,
+    setting,
+    paperSize: String(paperSize),
+    embedQR: String(embedQR) === 'true',
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="bill_${bill.code || bill._id}.pdf"`);
+  return res.end(buffer);
 });

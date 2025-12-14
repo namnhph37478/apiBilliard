@@ -222,28 +222,26 @@ exports.addItem = R.asyncHandler(async (req, res) => {
   if (!sess) return R.fail(res, 404, 'Session not found');
   if (sess.status !== 'open') return R.fail(res, 409, 'Session already closed/void');
 
- const prod = await Product.findById(productId).select('name price unit active images');
-if (!prod || prod.active === false) return R.fail(res, 400, 'Product not available');
+  const prod = await Product.findById(productId).select('name price unit active images');
+  if (!prod || prod.active === false) return R.fail(res, 400, 'Product not available');
 
-const imageSnapshot = Array.isArray(prod.images) && prod.images.length ? prod.images[0] : null;
+  const imageSnapshot = Array.isArray(prod.images) && prod.images.length ? prod.images[0] : null;
 
-const exist = sess.items.find((i) => String(i.product) === String(prod._id));
-if (exist) {
-  exist.qty = Number(exist.qty || 0) + Number(qty || 0);
-  if (typeof note !== 'undefined') exist.note = note;
-  // nếu chưa có imageSnapshot trên item và prod có ảnh, cập nhật (tùy chọn)
-  if (!exist.imageSnapshot && imageSnapshot) exist.imageSnapshot = imageSnapshot;
-} else {
-  sess.items.push({
-    product: prod._id,
-    nameSnapshot: prod.name,
-    priceSnapshot: prod.price,
-    qty: Number(qty || 1),
-    note: note || '',
-    imageSnapshot, // <-- lưu snapshot ảnh
-  });
-}
-
+  const exist = sess.items.find((i) => String(i.product) === String(prod._id));
+  if (exist) {
+    exist.qty = Number(exist.qty || 0) + Number(qty || 0);
+    if (typeof note !== 'undefined') exist.note = note;
+    if (!exist.imageSnapshot && imageSnapshot) exist.imageSnapshot = imageSnapshot;
+  } else {
+    sess.items.push({
+      product: prod._id,
+      nameSnapshot: prod.name,
+      priceSnapshot: prod.price,
+      qty: Number(qty || 1),
+      note: note || '',
+      imageSnapshot,
+    });
+  }
 
   await sess.save();
 
@@ -452,4 +450,85 @@ exports.void = R.asyncHandler(async (req, res) => {
   await Table.findByIdAndUpdate(sess.table, { $set: { status: 'available' } });
 
   return R.ok(res, sanitize(sess), 'Session voided');
+});
+
+/* ===================== NEW: Transfer session to another table ===================== */
+// PATCH /sessions/:id/transfer
+// Body: { toTableId, note? }
+exports.transfer = R.asyncHandler(async (req, res) => {
+  const id = getSessionId(req);
+  if (!id) return R.fail(res, 400, 'Missing session id');
+
+  const { toTableId, note } = req.body || {};
+  if (!toTableId) return R.fail(res, 400, 'Missing toTableId');
+
+  const sess = await Session.findById(id);
+  if (!sess) return R.fail(res, 404, 'Session not found');
+  if (sess.status !== 'open') return R.fail(res, 409, 'Session already closed/void');
+
+  // chuyển sang đúng bàn hiện tại
+  if (String(sess.table) === String(toTableId)) {
+    return R.ok(res, sanitize(sess), 'Session already on this table');
+  }
+
+  const [fromTable, toTable] = await Promise.all([
+    Table.findById(sess.table).lean(),
+    Table.findById(toTableId).lean(),
+  ]);
+
+  if (!fromTable) return R.fail(res, 400, 'From table not found');
+  if (!toTable || toTable.active === false) return R.fail(res, 400, 'Target table not available');
+
+  // bàn đích phải trống
+  if (toTable.status !== 'available') {
+    return R.fail(res, 409, 'Target table is not available');
+  }
+
+  // chắc chắn bàn đích không có session open
+  const exists = await Session.exists({ table: toTable._id, status: 'open' });
+  if (exists) return R.fail(res, 409, 'Target table already has an open session');
+
+  // hệ thống hiện snapshot 1 rate cho cả phiên, chặn nếu giá khác để tránh tính sai
+  const curRate = Number(sess.pricingSnapshot?.ratePerHour || 0);
+  const nextRate = Number(toTable.ratePerHour || 0);
+  if (curRate !== nextRate) {
+    return R.fail(res, 409, 'Bàn đích có giá/giờ khác, hiện chưa hỗ trợ tính theo nhiều mức giá');
+  }
+
+  // update trạng thái bàn
+  await Promise.all([
+    Table.findByIdAndUpdate(fromTable._id, { $set: { status: 'available' } }),
+    Table.findByIdAndUpdate(toTable._id, { $set: { status: 'playing' } }),
+  ]);
+
+  // update session
+  sess.table = toTable._id;
+  sess.areaId = toTable.areaId || null;
+
+  if (String(note || '').trim()) {
+    const prev = sess.note ? String(sess.note).trim() : '';
+    const extra = `Chuyển bàn: ${fromTable.name} -> ${toTable.name}. ${String(note).trim()}`;
+    sess.note = prev ? `${prev}\n${extra}` : extra;
+  } else {
+    const prev = sess.note ? String(sess.note).trim() : '';
+    const extra = `Chuyển bàn: ${fromTable.name} -> ${toTable.name}.`;
+    sess.note = prev ? `${prev}\n${extra}` : extra;
+  }
+
+  try {
+    await sess.save();
+  } catch (err) {
+    // rollback trạng thái bàn nếu lưu session lỗi
+    await Promise.allSettled([
+      Table.findByIdAndUpdate(fromTable._id, { $set: { status: 'playing' } }),
+      Table.findByIdAndUpdate(toTable._id, { $set: { status: 'available' } }),
+    ]);
+
+    if (String(err?.code) === '11000') {
+      return R.fail(res, 409, 'Target table just got a new open session');
+    }
+    throw err;
+  }
+
+  return R.ok(res, sanitize(sess), 'Session transferred');
 });

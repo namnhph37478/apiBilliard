@@ -58,6 +58,14 @@ router.post(
   ctrl.checkout
 );
 
+/* ------------------------------ Đổi bàn (mới) ------------------------------ */
+// PATCH /api/v1/sessions/:id/transfer
+router.patch(
+  '/sessions/:id/transfer',
+  validate(schema.transfer),
+  ctrl.transfer
+);
+
 /* ------------------------------- Huỷ phiên ------------------------------- */
 // PATCH /api/v1/sessions/:id/void
 router.patch('/sessions/:id/void', validate(schema.void), ctrl.void);

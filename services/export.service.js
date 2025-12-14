@@ -57,12 +57,12 @@ function fmtVND(n) {
 function ensureRange({ from, to }) {
   const now = new Date();
   const start = from ? new Date(from) : new Date(now.setHours(0, 0, 0, 0));
-  const end = to ? new Date(to) : new Date(); // tới hiện tại
+  const end = to ? new Date(to) : new Date();
   if (!to) end.setHours(23, 59, 59, 999);
   return { from: start, to: end };
 }
 function mmToPt(mm) {
-  return (mm / 25.4) * 72; // 1 inch = 25.4mm = 72pt
+  return (mm / 25.4) * 72;
 }
 function toBufferFromPdf(doc) {
   return new Promise((resolve, reject) => {
@@ -74,15 +74,7 @@ function toBufferFromPdf(doc) {
 }
 
 // ----------------------- Excel: Bills list (ALIGNS WITH bill.controller) -----------------------
-/**
- * Ghi Excel từ mảng bills đã truyền vào (controller đã query & filter).
- * @param {Array<Object>} bills - danh sách hoá đơn (lean docs)
- * @param {Object} options
- *  - fileName?: string (tên file muốn xuất)
- * @returns {Promise<{filePath: string, fileName: string}>}
- */
 async function exportBillsToExcel(bills = [], options = {}) {
-  // Chuẩn hóa dữ liệu
   const rows = (bills || []).map((b) => {
     const discountArray =
       (Array.isArray(b.discounts) && b.discounts) ||
@@ -123,7 +115,6 @@ async function exportBillsToExcel(bills = [], options = {}) {
     };
   });
 
-  // Workbook
   const wb = new ExcelJS.Workbook();
   wb.creator = 'apiBilliard';
   wb.created = new Date();
@@ -147,13 +138,9 @@ async function exportBillsToExcel(bills = [], options = {}) {
     { header: 'Paid', key: 'paid', width: 8 },
   ];
 
-  // Header
   ws.getRow(1).font = { bold: true };
-
-  // Rows
   rows.forEach((r) => ws.addRow(r));
 
-  // Number formats for amounts
   const amountCols = ['H', 'I', 'J', 'K', 'L'];
   for (let i = 2; i <= ws.rowCount; i++) {
     amountCols.forEach((col) => {
@@ -161,7 +148,6 @@ async function exportBillsToExcel(bills = [], options = {}) {
     });
   }
 
-  // Footer totals
   const lastDataRow = ws.rowCount;
   const sumRowIdx = lastDataRow + 2;
   ws.addRow({});
@@ -176,7 +162,6 @@ async function exportBillsToExcel(bills = [], options = {}) {
     ws.getCell(`${col}${sumRowIdx}`).font = { bold: true };
   });
 
-  // Save
   const fileName = options.fileName || `bills_${nowStamp()}.xlsx`;
   const filePath = path.join(EXPORT_DIR, fileName);
   await wb.xlsx.writeFile(filePath);
@@ -184,14 +169,10 @@ async function exportBillsToExcel(bills = [], options = {}) {
   return { filePath, fileName };
 }
 
-// ----------------------- Excel: Reports pack (giữ nguyên để dùng nơi khác) -----------------------
-/**
- * Xuất Excel nhiều sheet: Summary, Daily, TopTables, TopProductsQty, TopProductsAmount, ByStaff, ByPayment
- */
+// ----------------------- Excel: Reports pack -----------------------
 async function exportReportsExcel({ from, to, branchId = null, paidOnly = true } = {}) {
   const range = ensureRange({ from, to });
 
-  // Load data via report.service
   const [summary, daily, tables, topQty, topAmount, staff, payments] =
     await Promise.all([
       summaryReport({ ...range, branchId, paidOnly }),
@@ -207,7 +188,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
   wb.creator = 'apiBilliard';
   wb.created = new Date();
 
-  // Summary
   const wsSum = wb.addWorksheet('Summary');
   wsSum.addRow(['From', fmtDate(range.from)]);
   wsSum.addRow(['To', fmtDate(range.to)]);
@@ -224,7 +204,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     (addr) => (wsSum.getCell(addr).numFmt = '#,##0')
   );
 
-  // Daily
   const wsDaily = wb.addWorksheet('Daily');
   wsDaily.columns = [
     { header: 'Date', key: 'date', width: 12 },
@@ -243,7 +222,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     );
   }
 
-  // TopTables
   const wsTbl = wb.addWorksheet('TopTables');
   wsTbl.columns = [
     { header: 'Table', key: 'tableName', width: 16 },
@@ -260,7 +238,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     );
   }
 
-  // TopProducts (Qty)
   const wsPQ = wb.addWorksheet('TopProductsQty');
   wsPQ.columns = [
     { header: 'Product', key: 'name', width: 26 },
@@ -275,7 +252,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     );
   }
 
-  // TopProducts (Amount)
   const wsPA = wb.addWorksheet('TopProductsAmount');
   wsPA.columns = [
     { header: 'Product', key: 'name', width: 26 },
@@ -290,7 +266,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     );
   }
 
-  // ByStaff
   const wsStaff = wb.addWorksheet('ByStaff');
   wsStaff.columns = [
     { header: 'Staff Id', key: 'staff', width: 26 },
@@ -306,7 +281,6 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
     );
   }
 
-  // ByPayment
   const wsPay = wb.addWorksheet('ByPayment');
   wsPay.columns = [
     { header: 'Method', key: 'paymentMethod', width: 16 },
@@ -328,20 +302,9 @@ async function exportReportsExcel({ from, to, branchId = null, paidOnly = true }
 }
 
 // ----------------------- PDF: Bill receipt (ALIGNS WITH bill.controller) -----------------------
-/**
- * Tạo PDF hoá đơn và trả về buffer (không ghi file).
- * Phù hợp với bill.controller.print → { buffer }.
- * @param {Object} args
- *  - bill: Bill (lean doc)
- *  - setting: Setting doc (optional)
- *  - paperSize: '58mm'|'80mm'|'A4' (mặc định '80mm')
- *  - embedQR: boolean
- * @returns {Promise<{buffer: Buffer}>}
- */
 async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true }) {
   if (!bill) throw new Error('Bill is required');
 
-  // Lấy setting nếu chưa cung cấp
   const effSetting =
     setting ||
     (await getActiveSetting(bill.branchId || null).catch(() => null));
@@ -361,6 +324,9 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
       : { top: 10, left: 10, right: 10, bottom: 10 };
 
   const doc = new PDFDocument({ size, margins });
+
+  // FIX: gom buffer ngay từ đầu, trước khi viết doc.text(...)
+  const bufferPromise = toBufferFromPdf(doc);
 
   // Header
   doc
@@ -413,8 +379,7 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
     const col3 = Math.floor(w * 0.20);
     const col4 = Math.floor(w * 0.20);
 
-    const x = doc.x,
-      y = doc.y;
+    const x = doc.x, y = doc.y;
     doc
       .fontSize(paperSize === 'A4' ? 10 : 8)
       .text(name, x, y, { width: col1, continued: true });
@@ -436,17 +401,13 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
 
   const items = Array.isArray(bill.items) ? bill.items : [];
 
-  // PLAY item(s)
   items
     .filter((i) => i.type === 'play')
     .forEach((it) => {
-      const name = `Tiền giờ (${it.minutes || 0}’ @ ${fmtVND(
-        it.ratePerHour || 0
-      )}/h)`;
+      const name = `Tiền giờ (${it.minutes || 0}’ @ ${fmtVND(it.ratePerHour || 0)}/h)`;
       line(name, 1, it.ratePerHour || 0, it.amount || 0);
     });
 
-  // PRODUCT items
   items
     .filter((i) => i.type === 'product')
     .forEach((it) => {
@@ -469,8 +430,7 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
     const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const colL = Math.floor(w * 0.65);
     const colR = Math.floor(w * 0.35);
-    const x = doc.x,
-      y = doc.y;
+    const x = doc.x, y = doc.y;
     if (bold) doc.font('Helvetica-Bold');
     doc
       .fontSize(paperSize === 'A4' ? 11 : 9)
@@ -511,7 +471,7 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
       .fontSize(9)
       .text(`Đã thanh toán lúc: ${fmtDate(bill.paidAt || bill.createdAt)}`);
 
-  // Footer & QR/text-link
+  // Footer & e-receipt link
   doc.moveDown(0.8);
   if (Array.isArray(print?.footerLines) && print.footerLines.length) {
     print.footerLines.forEach((lineText) =>
@@ -528,10 +488,7 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
     bill?._id;
 
   if (canShowLink) {
-    const url = `${String(eReceipt.baseUrl).replace(/\/+$/, '')}/bill/${
-      bill._id
-    }`;
-    // Hiển thị link (nhẹ, không phụ thuộc QR lib)
+    const url = `${String(eReceipt.baseUrl).replace(/\/+$/, '')}/bill/${bill._id}`;
     doc.fontSize(8).text('Xem hóa đơn điện tử:', { align: 'center' });
     doc
       .fontSize(8)
@@ -540,18 +497,13 @@ async function renderBillPDF({ bill, setting, paperSize = '80mm', embedQR = true
       .fillColor('black');
   }
 
-  const bufferPromise = toBufferFromPdf(doc);
   doc.end();
-  const buffer = await bufferPromise;
 
+  const buffer = await bufferPromise;
   return { buffer };
 }
 
 // ----------------------- Legacy: Export bills by querying (optional) -----------------------
-/**
- * (Tuỳ chọn) Tự query hoá đơn và xuất Excel — dùng khi cần nhanh trong nội bộ.
- * Không được bill.controller gọi trực tiếp (controller dùng exportBillsToExcel).
- */
 async function exportBillsExcel(opt = {}) {
   const { from, to, branchId = null, paidOnly = true } = opt;
   const range = ensureRange({ from, to });
@@ -574,11 +526,9 @@ async function exportBillsExcel(opt = {}) {
 
 // ----------------------- Exports -----------------------
 module.exports = {
-  // Used by controllers/bill.controller.js
-  exportBillsToExcel, // (items, {fileName}) -> {filePath, fileName}
-  renderBillPDF, // ({bill, setting, paperSize, embedQR}) -> {buffer}
+  exportBillsToExcel,
+  renderBillPDF,
 
-  // Optional utilities (kept for admin/reporting pages)
   exportReportsExcel,
   exportBillsExcel,
 

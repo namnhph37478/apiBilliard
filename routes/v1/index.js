@@ -35,6 +35,20 @@ router.get('/version', (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
+/*                          Public e-Receipt (NO AUTH)                         */
+/* -------------------------------------------------------------------------- */
+/**
+ * Dùng cho QR mở bill mà không cần đăng nhập.
+ * Lưu ý: Controller publicView/publicPrint đã tự chặn bill chưa paid bằng 404.
+ * URL:
+ *  - GET /api/v1/bill/:id
+ *  - GET /api/v1/bill/:id/pdf
+ */
+const billCtrl = require('../../controllers/bill.controller');
+router.get('/bill/:id', billCtrl.publicView);
+router.get('/bill/:id/pdf', billCtrl.publicPrint);
+
+/* -------------------------------------------------------------------------- */
 /*                                Sub-routes                                  */
 /* -------------------------------------------------------------------------- */
 /**

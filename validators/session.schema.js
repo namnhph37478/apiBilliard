@@ -14,8 +14,8 @@ const PAYMENT_METHODS = ['cash', 'card', 'transfer', 'other'];
 const discountLine = Joi.object({
   name: Joi.string().trim().max(160).default('Discount'),
   type: Joi.string().valid('percent', 'value').required(),
-  value: Joi.number().min(0).required(),          // percent: 0..100, value: VND
-  amount: Joi.number().min(0).optional(),         // nếu không gửi → service tự tính
+  value: Joi.number().min(0).required(), // percent: 0..100, value: VND
+  amount: Joi.number().min(0).optional(), // nếu không gửi → service tự tính
   meta: Joi.any().optional(),
 });
 
@@ -27,17 +27,16 @@ module.exports.list = {
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(200).default(20),
 
-    q: Joi.string().trim().allow('', null),                 // tìm theo note, tableName (nếu có)
+    q: Joi.string().trim().allow('', null),
     status: Joi.string().valid(...SESSION_STATUS).optional(),
     table: objectId().optional(),
     staffStart: objectId().optional(),
     staffEnd: objectId().optional(),
-    areaId: objectId().allow(null, ''),                     // lọc theo khu vực (snapshot)
+    areaId: objectId().allow(null, ''),
 
-    from: Joi.date().iso().optional(),                      // lọc theo startTime
+    from: Joi.date().iso().optional(),
     to: Joi.date().iso().optional(),
 
-    // sort: 'startTime' | '-startTime' | 'createdAt' | '-createdAt'
     sort: Joi.string()
       .trim()
       .pattern(/^(-)?(startTime|createdAt)$/)
@@ -49,7 +48,7 @@ module.exports.list = {
 module.exports.open = {
   body: Joi.object({
     tableId: objectId().required(),
-    startAt: Joi.date().iso().optional(),                   // mặc định now
+    startAt: Joi.date().iso().optional(),
     note: Joi.string().trim().max(300).allow('', null).optional(),
   }),
 };
@@ -65,7 +64,6 @@ module.exports.addItem = {
 };
 
 // PATCH /sessions/:id/items/:itemId  (cập nhật số lượng 1 item)
-// Lưu ý: qty = 0 có thể hiểu là xóa item (tuỳ controller quyết định)
 module.exports.updateItemQty = {
   params: Joi.object({
     id: objectId().required(),
@@ -89,7 +87,7 @@ module.exports.removeItem = {
 module.exports.previewClose = {
   params: Joi.object({ id: objectId().required() }),
   query: Joi.object({
-    endAt: Joi.date().iso().optional(),                      // mặc định now
+    endAt: Joi.date().iso().optional(),
   }),
 };
 
@@ -111,6 +109,15 @@ module.exports.void = {
   params: Joi.object({ id: objectId().required() }),
   body: Joi.object({
     reason: Joi.string().trim().max(300).required(),
+  }),
+};
+
+// PATCH /sessions/:id/transfer  (đổi bàn)
+module.exports.transfer = {
+  params: Joi.object({ id: objectId().required() }),
+  body: Joi.object({
+    toTableId: objectId().required(),
+    note: Joi.string().trim().max(300).allow('', null).optional(),
   }),
 };
 

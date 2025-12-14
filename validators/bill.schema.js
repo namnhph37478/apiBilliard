@@ -76,7 +76,11 @@ module.exports.print = {
   params: Joi.object({ id: objectId().required() }),
   query: Joi.object({
     paperSize: Joi.string().valid(...PAPER_SIZES).default('80mm'),
-    embedQR: Joi.boolean().default(true),
+    embedQR: Joi.boolean()
+      .truthy('true', '1')
+      .falsy('false', '0')
+      .default(true),
+
   }),
 };
 
