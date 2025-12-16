@@ -71,6 +71,7 @@ const areaRoutes = require('./areas.routes');
 // Mount lần lượt
 router.use(authRoutes);
 router.use(userRoutes);
+router.use('/areas', areaRoutes);
 router.use(tableRoutes);
 router.use(sessionRoutes);
 router.use(productRoutes);
@@ -82,6 +83,6 @@ router.use(settingRoutes);
 
 // Areas: trong areas.routes.js path là '/', '/:id'
 // nên mount với prefix '/areas'
-router.use('/areas', areaRoutes);
+
 
 module.exports = router;
